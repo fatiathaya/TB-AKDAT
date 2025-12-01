@@ -1,0 +1,4 @@
+"""
+Styles module for ForestCal
+"""
+
