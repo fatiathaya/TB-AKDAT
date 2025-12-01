@@ -16,7 +16,6 @@ import seaborn as sns
 import io
 import base64
 
-# Page config
 st.set_page_config(
     page_title="ForestCal - Prediksi Kalori",
     page_icon="🌲",
@@ -24,7 +23,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS untuk dark purple theme
+
 st.markdown("""
 <style>
     /* Main background */
@@ -100,21 +99,53 @@ st.markdown("""
         border-color: #a78bfa;
     }
     
-    /* Button styling */
+    /* Global button styling (non-sidebar) */
     .stButton>button {
-        background-color: #8b5cf6;
-        color: white;
-        border: none;
         border-radius: 8px;
-        padding: 0.5rem 1.5rem;
         font-weight: 500;
-        transition: all 0.3s;
+        transition: all 0.25s ease;
     }
     
     .stButton>button:hover {
-        background-color: #7c3aed;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    }
+    
+    /* Sidebar navigation buttons - modern pill style */
+    [data-testid="stSidebar"] .stButton>button {
+        width: 100%;
+        justify-content: flex-start;
+        border-radius: 999px;
+        padding: 0.6rem 1rem;
+        font-size: 0.95rem;
+        border: 1px solid transparent;
+        background: transparent;
+        color: #e5e7eb;
+        box-shadow: none;
+    }
+    
+    [data-testid="stSidebar"] .stButton>button[kind="secondary"] {
+        background: linear-gradient(90deg, rgba(148, 163, 184, 0.15), rgba(30, 64, 175, 0.0));
+    }
+    
+    [data-testid="stSidebar"] .stButton>button[kind="secondary"]:hover {
+        background: linear-gradient(90deg, rgba(129, 140, 248, 0.45), rgba(59, 130, 246, 0.15));
+        border-color: rgba(129, 140, 248, 0.7);
+        transform: translateY(-1px);
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.75);
+    }
+    
+    [data-testid="stSidebar"] .stButton>button[kind="primary"] {
+        background: linear-gradient(90deg, #8b5cf6, #ec4899);
+        border-color: rgba(248, 250, 252, 0.5);
+        color: white;
+        box-shadow: 0 10px 25px rgba(139, 92, 246, 0.6);
+    }
+    
+    [data-testid="stSidebar"] .stButton>button[kind="primary"]:hover {
+        filter: brightness(1.05);
+        transform: translateY(-1px);
+        box-shadow: 0 14px 30px rgba(139, 92, 246, 0.9);
     }
     
     /* Table styling */
@@ -252,10 +283,9 @@ st.markdown("""
         margin-top: 0.5rem;
     }
     
-    /* Hide Streamlit default elements */
+    /* Hide Streamlit default elements (jangan sembunyikan header agar tombol sidebar tetap muncul) */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    header {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -293,15 +323,17 @@ with st.sidebar:
     
     for menu_name, icon in menu_items.items():
         is_active = st.session_state.page == menu_name
-        active_class = "active" if is_active else ""
-        if st.button(f"{icon} {menu_name}", key=f"menu_{menu_name}", use_container_width=True):
+        button_type = "primary" if is_active else "secondary"
+        if st.button(f"{icon} {menu_name}", key=f"menu_{menu_name}", use_container_width=True, type=button_type):
             st.session_state.page = menu_name
             st.rerun()
     
     st.markdown("---")
     st.markdown("### Analisis Data Pribadi")
     
-    if st.button("➕ Analisis", key="menu_analisis_pribadi", use_container_width=True):
+    is_personal_active = st.session_state.page == 'Analisis Pribadi'
+    personal_button_type = "primary" if is_personal_active else "secondary"
+    if st.button("➕ Analisis", key="menu_analisis_pribadi", use_container_width=True, type=personal_button_type):
         st.session_state.page = 'Analisis Pribadi'
         st.rerun()
 
@@ -438,6 +470,43 @@ elif st.session_state.page == 'Preprocessing':
         if st.session_state.feature_cols is None or not all(f in all_columns for f in st.session_state.feature_cols):
             st.session_state.feature_cols = [c for c in all_columns if c not in [st.session_state.target_col, 'ID']]
         
+        # Card: Pemilihan Target dan Fitur
+        st.markdown('<div class="preprocessing-card">', unsafe_allow_html=True)
+        st.markdown("### Pemilihan Target dan Fitur")
+        
+        col_tgt, col_feat = st.columns(2)
+        with col_tgt:
+            selected_target = st.selectbox(
+                "Pilih kolom target (nilai yang ingin diprediksi)",
+                options=all_columns,
+                index=all_columns.index(st.session_state.target_col) if st.session_state.target_col in all_columns else 0,
+                key="target_col_select"
+            )
+            st.session_state.target_col = selected_target
+        
+        with col_feat:
+            possible_features = [c for c in all_columns if c != st.session_state.target_col]
+            default_features = [
+                c for c in st.session_state.feature_cols
+                if c in possible_features
+            ]
+            if not default_features:
+                default_features = [c for c in possible_features if c != 'ID']
+            selected_features = st.multiselect(
+                "Pilih fitur yang digunakan untuk prediksi",
+                options=possible_features,
+                default=default_features,
+                key="feature_cols_select"
+            )
+            st.session_state.feature_cols = selected_features
+        
+        st.markdown(
+            "Pastikan kolom target benar-benar **kalori yang terbakar** dan fitur hanya berisi "
+            "variabel yang diketahui sebelum aktivitas (tidak ada kebocoran label).",
+            unsafe_allow_html=False
+        )
+        st.markdown('</div>', unsafe_allow_html=True)
+        
         # Initialize default values for training
         target_col = st.session_state.target_col
         feature_cols = st.session_state.feature_cols
@@ -470,7 +539,11 @@ elif st.session_state.page == 'Preprocessing':
         
         # Standard Scaler Option (outside card, at bottom)
         st.markdown("<br>", unsafe_allow_html=True)
-        scaling = st.checkbox("Gunakan Standar scaler untuk fitur numerik", value=True, key="scaling_option")
+        scaling = st.checkbox(
+            "Gunakan StandardScaler untuk fitur numerik (tidak wajib untuk Random Forest)",
+            value=False,
+            key="scaling_option"
+        )
         
         # Note: missing_strategy and scaling are automatically stored in session_state
         # via their widget keys ("missing_strategy" and "scaling_option")
@@ -551,7 +624,35 @@ elif st.session_state.page == 'Training Data':
                     st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # Section 3: Hyperparameter Random Forest
+        # Section 3: Penanganan Target & Outlier
+        st.markdown('<div class="training-section">', unsafe_allow_html=True)
+        st.markdown("### Penanganan Target & Outlier")
+        
+        col_out1, col_out2 = st.columns(2)
+        with col_out1:
+            target_outlier = st.selectbox(
+                "Penanganan outlier pada target kalori",
+                options=[
+                    'Tidak ada',
+                    'Trim (buang di luar 1% - 99%)',
+                    'Clip (batasi ke 1% - 99%)'
+                ],
+                key="target_outlier"
+            )
+        with col_out2:
+            log_target = st.checkbox(
+                "Gunakan transformasi log pada target (log1p)",
+                value=False,
+                key="log_target"
+            )
+        st.markdown(
+            "Transformasi log cocok bila distribusi kalori sangat miring (banyak nilai kecil, sedikit yang sangat besar). "
+            "Outlier ekstrem dapat dibuang (trim) atau dibatasi (clip) agar error tidak didominasi beberapa titik ekstrem.",
+            unsafe_allow_html=False
+        )
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Section 4: Hyperparameter Random Forest
         st.markdown('<div class="training-section">', unsafe_allow_html=True)
         st.markdown("### Hyperparameter Random Forest")
         
@@ -583,9 +684,18 @@ elif st.session_state.page == 'Training Data':
             step=1,
             key="min_samples_split_slider"
         )
+        
+        min_samples_leaf = st.slider(
+            "min_samples_leaf",
+            min_value=1,
+            max_value=20,
+            value=1,
+            step=1,
+            key="min_samples_leaf_slider"
+        )
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # Button: Run preprocessing & train
+        # preprocessing & training
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("Jalankan Preprocessing dan Latih Model", use_container_width=True, type="primary"):
             # Validate required variables
@@ -634,8 +744,25 @@ elif st.session_state.page == 'Training Data':
                 df_proc[target_col] = pd.to_numeric(df_proc[target_col], errors='coerce')
                 df_proc = df_proc.dropna(subset=[target_col])
                 
+                # Target series (original scale)
+                y_raw = df_proc[target_col].copy()
+                
+                # Penanganan outlier pada target
+                target_outlier = st.session_state.get('target_outlier', 'Tidak ada')
+                if target_outlier in ['Trim (buang di luar 1% - 99%)', 'Clip (batasi ke 1% - 99%)']:
+                    q_low = y_raw.quantile(0.01)
+                    q_high = y_raw.quantile(0.99)
+                    
+                    if target_outlier.startswith('Trim'):
+                        mask = (y_raw >= q_low) & (y_raw <= q_high)
+                        df_proc = df_proc[mask]
+                        y_raw = y_raw[mask]
+                    else:
+                        y_raw = y_raw.clip(q_low, q_high)
+                        df_proc[target_col] = y_raw
+                
+                # Fitur setelah penanganan outlier
                 X = df_proc[feature_cols].copy()
-                y = df_proc[target_col].copy()
                 
                 # Identify numeric and categorical
                 numeric_features = X.select_dtypes(include=[np.number]).columns.tolist()
@@ -658,49 +785,91 @@ elif st.session_state.page == 'Training Data':
                     n_estimators=n_estimators,
                     max_depth=max_depth,
                     min_samples_split=min_samples_split,
+                    min_samples_leaf=min_samples_leaf,
                     random_state=random_state
                 )
                 pipeline = Pipeline(steps=[('preprocessor', preprocessor), ('model', model)])
                 
-                # Split
-                X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=train_size, random_state=random_state)
+                # Target transform (log1p jika dipilih dan memungkinkan)
+                use_log_target = False
+                y_for_model = y_raw.copy()
+                if st.session_state.get('log_target', False):
+                    if (y_raw <= 0).any():
+                        st.warning("Transformasi log pada target diabaikan karena terdapat nilai kalori ≤ 0.")
+                    else:
+                        y_for_model = np.log1p(y_raw)
+                        use_log_target = True
+                
+                # Split data
+                if use_log_target:
+                    X_train, X_test, y_train, y_test_log, y_train_raw, y_test_raw = train_test_split(
+                        X, y_for_model, y_raw, train_size=train_size, random_state=random_state
+                    )
+                else:
+                    X_train, X_test, y_train_raw, y_test_raw = train_test_split(
+                        X, y_raw, train_size=train_size, random_state=random_state
+                    )
+                    y_train = y_train_raw  # untuk keseragaman variabel
                 
                 # Fit
                 with st.spinner('Melatih model...'):
                     pipeline.fit(X_train, y_train)
                 
-                # Predict
-                y_pred = pipeline.predict(X_test)
+                # Predict di ruang model
+                if use_log_target:
+                    y_pred_log = pipeline.predict(X_test)
+                    y_pred = np.expm1(y_pred_log)
+                else:
+                    y_pred = pipeline.predict(X_test)
+                
+                # Baseline model: selalu memprediksi rata-rata y_train (skala asli)
+                baseline_pred = np.full_like(y_test_raw, y_train_raw.mean(), dtype=float)
                 
                 # Store in session state
                 st.session_state.df_processed = df_proc
                 st.session_state.pipeline = pipeline
                 st.session_state.X_test = X_test
-                st.session_state.y_test = y_test
+                st.session_state.y_test = y_test_raw
                 st.session_state.y_pred = y_pred
                 st.session_state.X_train = X_train
-                st.session_state.y_train = y_train
+                st.session_state.y_train = y_train_raw
+                st.session_state.y_pred_baseline = baseline_pred
                 st.session_state.numeric_features = numeric_features
                 st.session_state.categorical_features = categorical_features
+                st.session_state.log_target_used = use_log_target
                 
                 st.success('✅ Pelatihan selesai! Model siap digunakan.')
                 
-                # Show metrics
-                mae = mean_absolute_error(y_test, y_pred)
-                mse = mean_squared_error(y_test, y_pred)
+                # Show metrics (di skala asli)
+                mae = mean_absolute_error(y_test_raw, y_pred)
+                mse = mean_squared_error(y_test_raw, y_pred)
                 rmse = np.sqrt(mse)
-                r2 = r2_score(y_test, y_pred)
+                r2 = r2_score(y_test_raw, y_pred)
+                mape = np.mean(np.abs((y_test_raw - y_pred) / y_test_raw)) * 100 if np.all(y_test_raw != 0) else np.nan
+                
+                # Baseline metrics
+                mae_base = mean_absolute_error(y_test_raw, baseline_pred)
+                rmse_base = np.sqrt(mean_squared_error(y_test_raw, baseline_pred))
+                r2_base = r2_score(y_test_raw, baseline_pred)
                 
                 st.markdown("### Hasil Evaluasi Model (Test Set)")
                 col1, col2, col3, col4 = st.columns(4)
                 with col1:
-                    st.metric("MAE", f"{mae:.3f}")
+                    st.metric("MAE (model)", f"{mae:.3f}", delta=f"{(mae_base - mae):.3f} vs baseline")
                 with col2:
-                    st.metric("RMSE", f"{rmse:.3f}")
+                    st.metric("RMSE (model)", f"{rmse:.3f}", delta=f"{(rmse_base - rmse):.3f} vs baseline")
                 with col3:
-                    st.metric("R² Score", f"{r2:.3f}")
+                    st.metric("R² (model)", f"{r2:.3f}", delta=f"{(r2 - r2_base):.3f} vs baseline")
                 with col4:
-                    st.metric("Akurasi", f"{(1 - mae/y_test.mean())*100:.2f}%")
+                    if not np.isnan(mape):
+                        st.metric("MAPE", f"{mape:.2f}%")
+                    else:
+                        st.metric("MAPE", "NA")
+                
+                st.info(
+                    "Model Random Forest yang baik seharusnya **lebih baik dari baseline rata-rata**. "
+                    "Perhatikan delta pada MAE/RMSE/R² untuk menilai apakah model sudah cukup baik."
+                )
                 
             except Exception as e:
                 st.error(f"❌ Terjadi error saat melakukan preprocessing dan training: {str(e)}")
@@ -781,6 +950,7 @@ elif st.session_state.page == 'Analisis Pribadi':
         feature_cols = st.session_state.feature_cols
         numeric_features = st.session_state.numeric_features
         categorical_features = st.session_state.categorical_features
+        log_target_used = st.session_state.get('log_target_used', False)
         
         st.markdown("### Prediksi Interaktif")
         st.write("Masukkan nilai fitur untuk memprediksi pembakaran kalori:")
@@ -810,7 +980,8 @@ elif st.session_state.page == 'Analisis Pribadi':
         if st.button('Prediksi Pembakaran Kalori', use_container_width=True, type="primary"):
             try:
                 sample_df = pd.DataFrame([sample_input])
-                pred_val = pipeline.predict(sample_df)[0]
+                pred_val_raw = pipeline.predict(sample_df)[0]
+                pred_val = np.expm1(pred_val_raw) if log_target_used else pred_val_raw
                 st.success(f"🔥 **Perkiraan pembakaran kalori: {pred_val:.2f} kalori**")
                 
                 # Show prediction with confidence interval (using std from residuals)
